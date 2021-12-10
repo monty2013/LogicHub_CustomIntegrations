@@ -25,22 +25,9 @@ RANGE_TYPE = ActionParam("RANGE_TYPE", description="Range Type",
                                                                      "opened",
                                                                      "closed"], default="updated", action="list_incidents")
 
-        
-        
-@action(name="Add Comment to Incident")
-def add_comment(inc_id: JinjaTemplatedStr, comment: JinjaTemplatedStr):
-    """
-    This action will add a comment into the Incident
-    :param inc_id: The Incident ID with Jinja format.
-    :param comment: the comment to be appended to the incident
-    :return:
-    """
-    response = http_request("POST", "/ws/incident/actions?incidentId="+inc_id+'&actionName=comment&comment='+urllib.parse.urlencode(comment))
-    if response.get('errors'):
-        return {"has_error":"true", "error_msg":(response.get('errors'))}
-    if 'result' in response:
-        return response     
-
+ACTION = ActionParam("ACTION", description="Action to take",
+                               input_type=InputType.SELECT, options=["Mark as concern and create incident","Non-Concern","Mark in progress (still investigating)"], 
+                               default="Non-Concern", action="take_inc_action")      
         
 @action(name="List Incidents")
 def list_incidents(query: JinjaTemplatedStr):
@@ -56,6 +43,80 @@ def list_incidents(query: JinjaTemplatedStr):
     if 'result' in response:
         return response["result"]["data"]["incidentItems"]                        
 
+
+@action(name="Add Comment to Incident")
+def add_inc_comment(inc_id: JinjaTemplatedStr, comment: JinjaTemplatedStr):
+    """
+    This action will add a comment into the Incident
+    :param inc_id: The Incident ID with Jinja format.
+    :param comment: the comment to be appended to the incident
+    :return:
+    """
+    response = http_request("POST", "/ws/incident/actions?incidentId="+inc_id+'&actionName=comment&comment='+urllib.parse.urlencode(comment))
+    if response.get('errors'):
+        return {"has_error":"true", "error_msg":(response.get('errors'))}
+    if 'result' in response:
+        return response     
+        
+        
+
+@action(name="Take Action on an Incident")
+def take_inc_action(inc_id: JinjaTemplatedStr):
+    """
+    This action will add a comment into the Incident
+    :param inc_id: The Incident ID with Jinja format.
+    :return:
+    """
+    response = http_request("POST", "/ws/incident/actions?incidentId="+inc_id+'&actionName='+urllib.parse.urlencode(ACTION.read()))
+    if response.get('errors'):
+        return {"has_error":"true", "error_msg":(response.get('errors'))}
+    if 'result' in response:
+        return response     
+        
+
+@action(name="Top Violators")
+def top_violators(days: JinjaTemplatedStr,max: JinjaTemplatedStr):
+    """
+    This action will retrieve top N violators
+    :param days: Last X days, a number.
+    :param max: Max records to return
+    :return:
+    """
+    response = http_request("GET", "/ws/sccWidget/getTopViolators?dateunit=days&dateunitvalue="+days+"&offset=0&max="+max)
+    if response.get('errors'):
+        return {"has_error":"true", "error_msg":(response.get('errors'))}
+    if 'Response' in response:
+        return response["Response"]["Docs"]     
+
+
+@action(name="Top Violations")
+def top_violations(days: JinjaTemplatedStr,max: JinjaTemplatedStr):
+    """
+    This action will retrieve top N violations
+    :param days: Last X days, a number.
+    :param max: Max records to return
+    :return:
+    """
+    response = http_request("GET", "/ws/sccWidget/getTopViolations?dateunit=days&dateunitvalue="+days+"&offset=0&max="+max)
+    if response.get('errors'):
+        return {"has_error":"true", "error_msg":(response.get('errors'))}
+    if 'Response' in response:
+        return response["Response"]["Docs"]     
+
+@action(name="Top Threats")
+def top_threats(days: JinjaTemplatedStr,max: JinjaTemplatedStr):
+    """
+    This action will retrieve top N threats
+    :param days: Last X days, a number.
+    :param max: Max records to return
+    :return:
+    """
+    response = http_request("GET", "/ws/sccWidget/getTopThreats?dateunit=days&dateunitvalue="+days+"&offset=0&max="+max)
+    if response.get('errors'):
+        return {"has_error":"true", "error_msg":(response.get('errors'))}
+    if 'Response' in response:
+        return response["Response"]["Docs"]     
+        
 
 def http_request(method, url_suffix, params={}, data=None):
     token = os.environ.get('TOKEN', 'Not Set')
