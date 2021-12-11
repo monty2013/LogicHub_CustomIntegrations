@@ -27,7 +27,12 @@ RANGE_TYPE = ActionParam("RANGE_TYPE", description="Range Type",
 
 ACTION = ActionParam("ACTION", description="Action to take",
                                input_type=InputType.SELECT, options=["Mark as concern and create incident","Non-Concern","Mark in progress (still investigating)"], 
-                               default="Non-Concern", action="take_inc_action")      
+                               default="Non-Concern", action=["take_inc_action","take_violation_action"])      
+
+ENTITY_TYPE = ActionParam("ENTITY_TYPE", description="Action to take",
+                               input_type=InputType.SELECT, options=["Users", "Activityaccount", "RGActivityaccount", "Resources", "Activityip"], 
+                               default="Activityaccount", action="take_violation_action")      
+                    
         
 @action(name="List Incidents")
 def list_incidents(query: JinjaTemplatedStr):
@@ -57,7 +62,36 @@ def add_inc_comment(inc_id: JinjaTemplatedStr, comment: JinjaTemplatedStr):
         return {"has_error":"true", "error_msg":(response.get('errors'))}
     if 'result' in response:
         return response     
-        
+
+
+@action(name="take an action on a violation")
+def take_violation_action(policyName, resourceGroup, accountName, resourceName, comment: JinjaTemplatedStr):
+    """
+    This action will add a comment into the Incident
+    :param policyName: Policy Name or Violation Name.
+    :param resourceGroup: Resource Group Name or Datasource Name
+    :param accountName: Entity Name or accountName
+    :param resourceName: ResourceName
+    :param comment: the comment to be appended to the incident
+    :return:
+    """
+    
+    query_params = {
+        "tenantname":TENANT.read(),
+        "violationName": policyName,
+        "datasourceName": resourceGroup,
+        "entityType": ENTITY_TYPE.read(),
+        "entityName": accountName,
+        "actionName": ACTION.read(),
+        "resourceName":resourceName,
+        "comment": comment
+    }
+
+    response = http_request("POST", "/ws/incident/actions", params=query_params)
+    if response.get('errors'):
+        return {"has_error":"true", "error_msg":(response.get('errors'))}
+    if 'result' in response:
+        return response            
         
 
 @action(name="Take Action on an Incident")
@@ -174,4 +208,3 @@ def http_request(method, url_suffix, params={}, data=None):
     try:
         return res.json()
     except ValueError:
-        return None   
