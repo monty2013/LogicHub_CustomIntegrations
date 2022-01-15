@@ -19,7 +19,6 @@ API_TOKEN = ConnectionParam("API_TOKEN",
                             description="You will need to get this Token from Twinwave UI",
                             input_type=InputType.PASSWORD)
 
-
 # action type for add or delete rules
 USERNAME = ActionParam("USERNAME",
                                description="filter by this username", optional=True,
@@ -50,19 +49,14 @@ END_TIME_MS = input_helpers._get_safe_stripped_env_integer('__execution_end_time
 def validate_connections():
     if not URL.read():
         return [ValidationError(message="Parameter must be defined", param=URL)]
-
     if not API_TOKEN.read():
         return [ValidationError(message="Parameter must be defined", param=API_TOKEN)]
-
     url = f"{URL.read()}/engines"
-
-
     try:
         response = requests.get(url, headers={'Content-Type': 'application/json', 'X-API-KEY':API_TOKEN.read()})
         return response.raise_for_status()
     except Exception as ex:
         return [ValidationError(message=f"Authentication Failed")]
-
 
 @action(name="Recent Jobs")
 def recent_jobs():
@@ -105,6 +99,16 @@ def job_summary(job_id):
     """
     response = http_request("GET", "/jobs/" + job_id)
     return response
+    
+@action(name="Delete job")
+def delete_job(job_id):
+    """
+    Delete the job and its details
+    :param job_id: Job ID from previous steps
+    :return:
+    """
+    response = http_request("DELETE", "/jobs/" + job_id)
+    return response    
 
 @action(name="Get Job Normalized Forensics")
 def get_job_normalized_forensics(job_id):
@@ -129,7 +133,6 @@ def get_task_normalized_forensics(job_id, task_id):
         return {"has_error": "true", "error_msg": (response.get('errors'))}
     return response
 
-
 @action(name="Submit URL")
 def submit_url(scan_url: JinjaTemplatedStr):
     """
@@ -142,7 +145,6 @@ def submit_url(scan_url: JinjaTemplatedStr):
         req['priority'] = PRIORITY.read()
     if PROFILE.read():
         req['profile'] = PROFILE.read()
-
     response = http_request("POST", "/jobs/urls", data=json.dumps(req))
     return response
 
@@ -216,7 +218,6 @@ def search(term: JinjaTemplatedStr, field: JinjaTemplatedStr, count: JinjaTempla
     response = http_request("GET", "/jobs/search", params=query_params)
     return response
 
-
 def http_request(method, url_suffix, params={}, data=None, files=None):
     HEADERS = {
         'X-API-KEY': API_TOKEN.read(),
@@ -225,17 +226,8 @@ def http_request(method, url_suffix, params={}, data=None, files=None):
     }
     res = requests.request(method, URL.read() + url_suffix, verify=verify_ssl.verify_ssl_enabled(), params=params, data=data,headers=HEADERS, files=files)
     if res.status_code not in {200, 201}:
-        try:
-            errors = ''
-            for error in res.json().get('errors'):
-                errors = '\n' + errors + error.get('detail')
-            raise ValueError(
-                f'Error in API call to Twinwave #1 [{res.status_code}] - [{res.reason}] \n'
-                f'Error details: [{errors}]'
-            )
-        except Exception:
-            raise ValueError(
-                f'Error in API call to Twinwave #2 [{res.status_code}] - [{res.reason}]')
+        print(res.status_code)
+        print(res.text)
     try:
         return res.json()
     except ValueError:
