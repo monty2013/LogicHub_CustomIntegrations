@@ -139,13 +139,19 @@ def add_event(org_id, uuid, info: JinjaTemplatedStr, event_creator_email):
     """
     Publish the named event with requred and optional fields
     :param org_id: 10 characters or less organizationId, eg, ="12334", you can find this from the organization page.
+    :optional org_id: True
     :param uuid: 36 or less characters uniquely identifies this event. An event_id will be created for you afterward.
+    :optional uuid: True
     :param info: the description of this event. This is a Jinja template form which allow you to format the string
     :param event_creator_email: the creator's email address, optional, eg: ="monty@logichub.com"
     :optional event_creator_email: True
     :return:
     """
-    req = {"date": datetime.date.today().strftime('%Y-%m-%d'), "org_id": org_id, "orgc_id":org_id, "uuid":uuid, "info":info}
+    req = {"date": datetime.date.today().strftime('%Y-%m-%d'), "info":info}
+    if org_id:
+        req['org_id'] = org_id
+    if uuid:
+        req['uuid'] = uuid
     if THREAT_LEVEL.read():
         req['threat_level_id'] = THREAT_LEVEL.read()
     else:
