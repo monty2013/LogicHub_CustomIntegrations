@@ -10,6 +10,7 @@ from lhub_integ.params import ConnectionParam, ActionParam, InputType, JinjaTemp
 from lhub_integ.common import input_helpers, file_manager_client, validations, verify_ssl
 from lhub_integ import action, connection_validator
 import datetime
+import os
 
 URL = ConnectionParam("URL",
                       description="This is the API endpoint with API version. For example, https://your_misp_svr.domain.local",
@@ -17,30 +18,38 @@ URL = ConnectionParam("URL",
 API_TOKEN = ConnectionParam("API_TOKEN",
                             description="This is the API Authorization Token",
                             input_type=InputType.PASSWORD)
-MINIMAL = ActionParam("MINIMAL", description="Fetch for minimal data. The default is True", data_type=DataType.BOOL, optional=True,
-                               input_type=InputType.SELECT, default="True",options= ["True", "False"],
-                               action=["recent_event","all_events"])
-PUBLISHED = ActionParam("PUBLISHED", description="Search for Published? The default is True", data_type=DataType.BOOL, optional=True,
-                               input_type=InputType.SELECT, default="True",options= ["True", "False"],
-                               action="event_search")                               
+MINIMAL = ActionParam("MINIMAL", description="Fetch for minimal data. The default is True", data_type=DataType.BOOL,
+                      optional=True,
+                      input_type=InputType.SELECT, default="True", options=["True", "False"],
+                      action=["recent_event", "all_events"])
+PUBLISHED = ActionParam("PUBLISHED", description="Search for Published? The default is True", data_type=DataType.BOOL,
+                        optional=True,
+                        input_type=InputType.SELECT, default="True", options=["True", "False"],
+                        action="event_search")
 CATEGORY = ActionParam("CATEGORY", description="event category",
-                               optional=True,
-                               input_type=InputType.SELECT, options= ["Internal reference","Targeting data","Antivirus detection",
-                                    "Payload delivery","Artifacts dropped","Payload installation","Persistence mechanism","Network activity",
-                                    "Payload type","Attribution","External analysis","Financial fraud","Support Tool","Social network","Person","Other"],
-                               default=None, action="event_search")   
-THREAT_LEVEL = ActionParam("THREAT_LEVEL", description="Threat level where 1 is high, 2 is medium, 3 is low, and 4 is undefined",
-                               optional=True,default=None,
-                               input_type=InputType.SELECT,options= ["1","2","3","4"],
-                               action=["event_search","add_event"])   
-DISTRIBUTION = ActionParam("DISTRIBUTION", description="Who will be able to see this event once it becomes published: 0=your organization, 1=this community, 2=connected community, 3=all communities, 4=sharing group, 5=inherit event",
-                               optional=True,
-                               input_type=InputType.SELECT,options= ["0","1","2","3","4","5"],default=None,
-                               action="add_event")                                  
+                       optional=True,
+                       input_type=InputType.SELECT,
+                       options=["Internal reference", "Targeting data", "Antivirus detection",
+                                "Payload delivery", "Artifacts dropped", "Payload installation",
+                                "Persistence mechanism", "Network activity",
+                                "Payload type", "Attribution", "External analysis", "Financial fraud", "Support Tool",
+                                "Social network", "Person", "Other"],
+                       default=None, action="event_search")
+THREAT_LEVEL = ActionParam("THREAT_LEVEL",
+                           description="Threat level where 1 is high, 2 is medium, 3 is low, and 4 is undefined",
+                           optional=True, default=None,
+                           input_type=InputType.SELECT, options=["1", "2", "3", "4"],
+                           action=["event_search", "add_event"])
+DISTRIBUTION = ActionParam("DISTRIBUTION",
+                           description="Who will be able to see this event once it becomes published: 0=your organization, 1=this community, 2=connected community, 3=all communities, 4=sharing group, 5=inherit event",
+                           optional=True,
+                           input_type=InputType.SELECT, options=["0", "1", "2", "3", "4", "5"], default=None,
+                           action="add_event")
 ANALYSIS = ActionParam("ANALYSIS", description="Analysis Maturity Level: 0=Initial, 1=Ongoing, 2=Complete",
-                               optional=True,
-                               input_type=InputType.SELECT,options= ["0","1","2"],default=None,
-                                action="add_event")                                   
+                       optional=True,
+                       input_type=InputType.SELECT, options=["0", "1", "2"], default=None,
+                       action="add_event")
+
 
 @connection_validator
 def validate_connections():
@@ -50,12 +59,22 @@ def validate_connections():
         return [ValidationError(message="API Authorization Token must be defined", param=API_TOKEN)]
     url = f"{URL.read()}/events/index"
     # Just need to set a dummy payload for the search to return 200 status so the API token is validated
-    payload = {"limit":1, "minimal":True, "searchDatefrom":"2029-01-23"}
+    payload = {"limit": 1, "page": 0, "minimal": True, "searchDatefrom": "2029-01-23"}
     try:
-        response = requests.post(url, headers={'Content-Type': 'application/json','Accept': 'application/json', 'Authorization': API_TOKEN.read()}, data=json.dumps(payload))
+        response = requests.post(url, headers={'Content-Type': 'application/json', 'Accept': 'application/json',
+                                               'Authorization': API_TOKEN.read()}, data=json.dumps(payload),
+                                  verify=verify_ssl.verify_ssl_enabled())
         return response.raise_for_status()
+    except requests.exceptions.HTTPError as errh:
+        return [ValidationError(message="HTTP Error", param=errh)] 
+    except requests.exceptions.ConnectionError as errc:
+        return [ValidationError(message="Error Connecting:",param=errc)]
+    except requests.exceptions.Timeout as errt:
+        return [ValidationError(message="Timeout Error:",param=errt)]
+    except requests.exceptions.RequestException as err:
+        return [ValidationError(message="OOps: Something Else",param=err)]
     except Exception as ex:
-        return [ValidationError(message=f"Authentication Failed")]
+        return [ValidationError(message="Authentication Failed", param=ex)]
 
 
 @action(name="Last X Events")
@@ -73,9 +92,9 @@ def recent_event(X):
     try:
         i = int(X)
     except ValueError:
-        return {"has_error": True, "message":"X is not a number"}
+        return {"has_error": True, "message": "X is not a number"}
     except Exception:
-        return {"has_error": True, "message":"error converting X into number"}
+        return {"has_error": True, "message": "error converting X into number"}
     response = http_request("POST", "/events/index", data=json.dumps(params))
     return response[:i]
 
@@ -93,28 +112,28 @@ def event_search(value, value_type, last, org, event_id, tags):
     :param org: org name, eg: ="LogicHub"
     :optional org: True
     :param event_id: optional event_id, eg, ="3279" where 3279 is the event_id
-    :optional event_id: 
+    :optional event_id:
     :param tags: an comma separated string, eg: "tlp:amber","Type:OSINT"
     :optional tags: True
     :return:
     """
-    req = {"page": 0, "limit": 1, "returnFormat":"json"}
+    req = {"page": 0, "limit": 1, "returnFormat": "json"}
     if value:
         req["value"] = value
     if value_type:
         req["type"] = value_type
-    if last :
+    if last:
         req["last"] = last
-    else :
+    else:
         req["last"] = "1d"
     if org:
         req["org"] = org
     if event_id:
-        req["eventid"]=event_id
+        req["eventid"] = event_id
     if tags:
-        req["tags"]=[tags]
+        req["tags"] = [tags]
     if PUBLISHED.read():
-        req['published'] = PUBLISHED.read()        
+        req['published'] = PUBLISHED.read()
     if CATEGORY.read():
         req['category'] = CATEGORY.read()
     if THREAT_LEVEL.read():
@@ -131,9 +150,10 @@ def get_event(Event_ID):
     :param Event_ID: The Event_ID from previous step. If none available, you can do ='3223' where 3223 is the event_id.
     :return:
     """
-    response = http_request("GET", "/events/view/"+Event_ID)
-    return response 
-    
+    response = http_request("GET", "/events/view/" + Event_ID)
+    return response
+
+
 @action(name="Add Event")
 def add_event(org_id, uuid, info: JinjaTemplatedStr, event_creator_email):
     """
@@ -147,7 +167,7 @@ def add_event(org_id, uuid, info: JinjaTemplatedStr, event_creator_email):
     :optional event_creator_email: True
     :return:
     """
-    req = {"date": datetime.date.today().strftime('%Y-%m-%d'), "info":info}
+    req = {"date": datetime.date.today().strftime('%Y-%m-%d'), "info": info}
     if org_id:
         req['org_id'] = org_id
     if uuid:
@@ -161,14 +181,15 @@ def add_event(org_id, uuid, info: JinjaTemplatedStr, event_creator_email):
     else:
         req['distribution'] = "0"
     if ANALYSIS.read():
-        req['analysis'] = ANALYSIS.read()    
+        req['analysis'] = ANALYSIS.read()
     else:
         req['analysis'] = "0"
     if event_creator_email:
         req["event_creator_email"] = event_creator_email
     print(req)
     response = http_request("POST", "/events/add", data=json.dumps(req))
-    return response      
+    return response
+
 
 @action(name="Publish Event")
 def publish_event(Event_ID):
@@ -177,8 +198,9 @@ def publish_event(Event_ID):
     :param Event_ID: The Event_ID from previous step. If none available, you can do ='3223' where 3223 is the event_id.
     :return:
     """
-    response = http_request("POST", "/events/publish/"+Event_ID)
-    return response  
+    response = http_request("POST", "/events/publish/" + Event_ID)
+    return response
+
 
 @action(name="Unpublish Event")
 def unpublish_event(Event_ID):
@@ -187,9 +209,10 @@ def unpublish_event(Event_ID):
     :param Event_ID: The Event_ID from previous step. If none available, you can do ='3223' where 3223 is the event_id.
     :return:
     """
-    response = http_request("POST", "/events/unpublish/"+Event_ID)
-    return response 
-    
+    response = http_request("POST", "/events/unpublish/" + Event_ID)
+    return response
+
+
 @action(name="Delete Event")
 def delete_event(Event_ID):
     """
@@ -197,8 +220,9 @@ def delete_event(Event_ID):
     :param Event_ID: The Event_ID from previous step. If none available, you can do ='3223' where 3223 is the event_id.
     :return:
     """
-    response = http_request("DELETE", "/events/delete/"+Event_ID)
-    return response     
+    response = http_request("DELETE", "/events/delete/" + Event_ID)
+    return response
+
 
 @action(name="All Events")
 def all_events():
@@ -212,6 +236,7 @@ def all_events():
     params["minimal"] = MINIMAL.read()
     response = http_request("POST", "/events/index", data=json.dumps(params))
     return response
+
 
 def http_request(method, url_suffix, params={}, data=None, files=None):
     HEADERS = {
