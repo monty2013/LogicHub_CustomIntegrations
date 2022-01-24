@@ -10,7 +10,6 @@ from lhub_integ.params import ConnectionParam, ActionParam, InputType, JinjaTemp
 from lhub_integ.common import input_helpers, file_manager_client, validations, verify_ssl
 from lhub_integ import action, connection_validator
 import datetime
-import os
 
 URL = ConnectionParam("URL",
                       description="This is the API endpoint with API version. For example, https://your_misp_svr.domain.local",
@@ -66,15 +65,15 @@ def validate_connections():
                                   verify=verify_ssl.verify_ssl_enabled())
         return response.raise_for_status()
     except requests.exceptions.HTTPError as errh:
-        return [ValidationError(message="HTTP Error", param=errh)] 
+        return [ValidationError(message="Caught Exception: HTTPError: " + str(errh), param=URL)]
     except requests.exceptions.ConnectionError as errc:
-        return [ValidationError(message="Error Connecting:",param=errc)]
+        return [ValidationError(message="Caught Exception: ConnectionError: " + str(errc), param=URL)]
     except requests.exceptions.Timeout as errt:
-        return [ValidationError(message="Timeout Error:",param=errt)]
+        return [ValidationError(message="Caught Exception: Timeout Error: " + str(errt), param=URL)]
     except requests.exceptions.RequestException as err:
-        return [ValidationError(message="OOps: Something Else",param=err)]
+        return [ValidationError(message="Caught Exception: RequestException: " + str(err),param=URL)]
     except Exception as ex:
-        return [ValidationError(message="Authentication Failed", param=ex)]
+        return [ValidationError(message="Caught Exception: Catch all exception: "+str(ex), param=URL)]
 
 
 @action(name="Last X Events")
