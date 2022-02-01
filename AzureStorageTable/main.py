@@ -72,7 +72,9 @@ def insert_entity(table_name, entity):
             return {"message":"inserted"}
         except ResourceExistsError:
             print("Entity already exists")
-            return {"message":"failed"}  
+            return {"message":"failed"}
+        except HttpResponseError as e:
+            return {"message":e.message, "status":e.status_code, "reason":e.reason}
             
 @action(name="Query Entities")
 def query_entities(table_name, filters):
