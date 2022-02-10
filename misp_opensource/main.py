@@ -6,6 +6,7 @@ logoUrl: https://s3.amazonaws.com/lhub-public/integrations/misp-logo.png
 import requests
 import time
 import json
+import os
 from lhub_integ.params import ConnectionParam, ActionParam, InputType, JinjaTemplatedStr, DataType, ValidationError
 from lhub_integ.common import input_helpers, file_manager_client, validations, verify_ssl
 from lhub_integ import action, connection_validator
@@ -59,9 +60,14 @@ def validate_connections():
     url = f"{URL.read()}/events/index"
     # Just need to set a dummy payload for the search to return 200 status so the API token is validated
     payload = {"limit": 1, "page": 0, "minimal": True, "searchDatefrom": "2029-01-23"}
+    os_proxy = os.getenv('socks_proxy')
+    proxies = None
+    if os_proxy :
+        proxies = { "https": "socks5h://localhost-raservice:4101", "http":"socks5h://localhost-raservice:4101" }
+        
     try:
-        response = requests.post(url, headers={'Content-Type': 'application/json', 'Accept': 'application/json',
-                                               'Authorization': API_TOKEN.read()}, data=json.dumps(payload),
+        response = requests.post(url, headers={'Content-Type': 'application/json', 'Accept': 'application/json', 
+                                               'Authorization': API_TOKEN.read()}, data=json.dumps(payload), proxies=proxies,
                                   verify=verify_ssl.verify_ssl_enabled())
         return response.raise_for_status()
     except requests.exceptions.HTTPError as errh:
@@ -243,7 +249,11 @@ def http_request(method, url_suffix, params={}, data=None, files=None):
         'Content-Type': 'application/json',
         'Accept': 'application/json'
     }
-    res = requests.request(method, URL.read() + url_suffix, verify=verify_ssl.verify_ssl_enabled(), params=params,
+    os_proxy = os.getenv('socks_proxy')
+    proxies = None
+    if os_proxy :
+        proxies = { "https": "socks5h://localhost-raservice:4101", "http":"socks5h://localhost-raservice:4101" }    
+    res = requests.request(method, URL.read() + url_suffix, verify=verify_ssl.verify_ssl_enabled(), params=params, proxies=proxies,
                            data=data, headers=HEADERS, files=files)
     if res.status_code not in {200, 201}:
         print(res.status_code)
