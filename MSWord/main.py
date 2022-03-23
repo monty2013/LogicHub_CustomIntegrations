@@ -12,24 +12,21 @@ import ast
 from lhub_integ.params import ConnectionParam, ActionParam, InputType, JinjaTemplatedStr, DataType
 from lhub_integ import action
 
-TITLE = ActionParam("TITLE", description="Type in the Title for this new document", action="CreateNewFile", optional=False, default="New Title")
-HEADING = ActionParam("HEADING", description="Type in the Text for this Heading section", action="AppendHeading", optional=False, default="None")
-COLUMNS = ActionParam("COLUMNS", description="The number of Columns", data_type=DataType.INT, default="2", action="AppendTable")
-HEADER = ActionParam("HEADER", description="Header text comma separated", default="id,value", action="AppendTable")
 STYLE = ActionParam("STYLE", description="Pick a style, refer to Word table styles for more details", input_type=InputType.SELECT, options=['Light List Accent 1','Light Grid Accent 1','Light Shading Accent 1'], default='Light List Accent 1', action="AppendTable")
 
 base_path = "/opt/files/shared/integrationsFiles/"
 events_base = "/opt/files/service/event_files/"
 
 @action(name="Create New File")
-def CreateNewFile(DocFile):
+def CreateNewFile(DocFile, Title):
     """
     This action allows you to create a new Document with a title. The document name will be returned for reference.
-    :param DocFile: The column contains file name.
+    :param DocFile: The column contains file name or ='docname.docx'.
+    :param Title: The column contains the title or ='whatever title'
     :return: An instance to the file to be manipulated.
     """
     document = Document()
-    document.add_heading(TITLE.read(), 0)
+    document.add_heading(Title, 0)
     document.save(base_path + DocFile)
     return {
         "has_error": "false", "file_name": DocFile
@@ -52,7 +49,7 @@ def AppendImage(DocFile, ImageFile):
     }
 
 @action(name="Append Text")
-def AppendText(DocFile, Paragraph):
+def AppendText(DocFile, Paragraph:JinjaTemplatedStr):
     """
     The action allows you to append a paragraph into the word document.
     :param DocFile: The column contains file name.
@@ -68,31 +65,34 @@ def AppendText(DocFile, Paragraph):
 
 
 @action(name="Append Heading")
-def AppendHeading(DocFile):
+def AppendHeading(DocFile, Heading):
     """
     The action allows you to append a new heading into the word document.
     :param DocFile: The column contains file name.
+    :param Heading: The column contains the value or ="section heading"
     :return: An instance to the file to be manipulated.
     """
     document = Document(base_path+DocFile)
-    document.add_heading(HEADING.read())
+    document.add_heading(Heading)
     document.save(base_path+DocFile)
     return {
         "has_error":"false", "file_name":DocFile
     }
 
 @action(name="Append Table")
-def AppendTable(DocFile, RowArray: JinjaTemplatedStr):
+def AppendTable(DocFile, Columns:int, Headers, RowArray: JinjaTemplatedStr):
     """
     The action allows you to append a matrix table onto the word document.
     :param DocFile: The column contains file name.
+    :param Columns: The column specifies the number of columns or just enter =2 for 2 columns.
+    :param Headers: comma separated column headers either from a parent column, or just ="col1,col2,etc"
     :param RowArray: The column contains Row data, the data structure should be a matrix, for example: [['a','b'],['c','d']], where rows and columns.
     :return: An instance to the file to be manipulated.
     """
     document = Document(base_path+DocFile)
-    table = document.add_table(rows=1, cols=COLUMNS.read())
+    table = document.add_table(rows=1, cols=Columns)
     table.style=STYLE.read()
-    headers = HEADER.read().split(',')
+    headers = Headers.split(',')
     row = table.rows[0]
     col = 0
     for header in headers :
