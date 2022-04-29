@@ -105,7 +105,7 @@ def recent_event(X):
 
 
 @action(name="Search Events")
-def event_search(value, value_type, last, org, event_id, tags):
+def event_search(value, value_type, last, org, event_id, tags, limit):
     """
     Search for events with filters. With many options to either search for or filter by.
     :param value: String to search for, eg, ="127.9.0.1" or ="Malicious" or some hashcodes
@@ -120,6 +120,8 @@ def event_search(value, value_type, last, org, event_id, tags):
     :optional event_id:
     :param tags: an comma separated string, eg: "tlp:amber","Type:OSINT"
     :optional tags: True
+    :param limit: How many should be returned, eg: =10 means 10 events. Default is 1
+    :optional tags: True    
     :return:
     """
     req = {"page": 0, "limit": 1, "returnFormat": "json"}
@@ -137,6 +139,8 @@ def event_search(value, value_type, last, org, event_id, tags):
         req["eventid"] = event_id
     if tags:
         req["tags"] = [tags]
+    if limit:
+        req["limit"] = limit        
     if PUBLISHED.read():
         req['published'] = PUBLISHED.read()
     if CATEGORY.read():
